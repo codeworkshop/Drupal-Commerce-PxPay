@@ -1,0 +1,82 @@
+<?php
+
+/**
+ * @file
+ * Installation file for PxPay
+ */
+
+/**
+ * Implementation of hook_requirements().
+ */
+function commerce_dps_pxpay_requirements($phase) {
+  $t = get_t();
+
+  $has_curl = function_exists('curl_init');
+
+  $requirements['curl'] = array(
+    'title' => $t('cURL'),
+    'value' => $has_curl ? $t('Enabled') : $t('Not found'),
+  );
+
+  if (!$has_curl) {
+    $requirements['curl'] += array(
+      'severity' => REQUIREMENT_ERROR,
+      'description' => $t("Commerce Payment Express (PxPay) requires the PHP <a href='!curl_url'>cURL</a> library.", array('!curl_url' => 'http://php.net/manual/en/curl.setup.php')),
+    );
+  }
+
+  return $requirements;
+}
+
+/**
+ * Implements hook_schema().
+ */
+function commerce_dps_pxpay_schema() {
+  $schema = array();
+
+  $schema['commerce_dps_pxpay'] = array(
+    'description' => 'Stores processed transactions.',
+    'fields' => array(
+      'txn_id' => array(
+        'description' => 'Commerce Payment Express transaction ID.',
+        'type' => 'int',
+        'not null' => FALSE,
+      ),
+      'merchant_reference' => array(
+        'description' => 'Merchant reference assigned by Commerce Payment Express.',
+        'type' => 'varchar',
+        'length' => 20,
+        'not null' => TRUE,
+      ),
+      'cardholder_name' => array(
+        'description' => 'Cardholder name.',
+        'type' => 'varchar',
+        'length' => 100,
+        'not null' => TRUE,
+      ),
+      'uid' => array(
+        'description' => 'The User ID the payment belomngs to.',
+        'type' => 'int',
+        'unsigned' => TRUE,
+        'not null' => TRUE,
+        'default' => 0,
+      ),
+      'order_id' => array(
+        'description' => 'The order ID the payment belongs to.',
+        'type' => 'int',
+        'unsigned' => TRUE,
+        'not null' => TRUE,
+        'default' => 0,
+      ),
+      'created' => array(
+        'description' => 'The Unix timestamp when the record was created.',
+        'type' => 'int',
+        'not null' => TRUE,
+        'default' => 0,
+      ),
+    ),
+    'primary key' => array('txn_id'),
+  );
+
+  return $schema;
+}
