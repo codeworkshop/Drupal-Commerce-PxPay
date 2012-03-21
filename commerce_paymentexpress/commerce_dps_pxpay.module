@@ -26,42 +26,6 @@ function commerce_dps_pxpay_permission() {
     ));
 }
 
-/**
- * Implements hook_menu().
- */
-function commerce_dps_pxpay_menu() {
-  $items = array();
-
-  $items['admin/commerce/config/dpspxpay'] = array(
-    'title' => 'DPS PxPay settings',
-    'description' => 'Configure DPS PxPay settings.',
-    'page callback' => 'drupal_get_form',
-    'page arguments' => array('commerce_dps_pxpay_admin_settings_form'),
-    'access arguments' => array('administer commerce dps pxpay'),
-    'file' => 'includes/commerce_dps_pxpay.admin.inc',
-  );
-  $items['commerce_dps_pxpay/%/complete'] = array(
-    'title' => 'DPS payment complete',
-    'page callback' => 'uc_dps_pxpay_complete',
-    'page arguments' => array(1),
-    'access arguments' => array('access content'),
-    'type' => MENU_CALLBACK,
-    'file' => 'includes/commerce_dps_pxpay.pages.inc',
-  );
-  $items['commerce_dps_pxpay/%/cancel'] = array(
-    'title' => 'DPS payment cancelled',
-    'page callback' => 'uc_dps_pxpay_cancel',
-    'page arguments' => array(1),
-    'access arguments' => array('access content'),
-    'type' => MENU_CALLBACK,
-    'file' => 'includes/commerce_dps_pxpay.pages.inc',
-  );
-
-
-  return $items;
-}
-
-
 
 /*******************************************************************************
  * Hook Functions (Drupal Commerce)
@@ -75,8 +39,8 @@ function commerce_dps_pxpay_commerce_payment_method_info() {
       'display_title' => t('Credit card'),
       'description' => t('Provides integration with the DPS PxPay payment gateway.'),
       'terminal' => FALSE,
-      'active' => TRUE,
       'offsite' => TRUE,
+      'offsite_autoredirect' => TRUE,
     ),
   );
 }
@@ -85,6 +49,73 @@ function commerce_dps_pxpay_commerce_payment_method_info() {
 /*******************************************************************************
  * Callback Functions, Forms, and Tables
  ******************************************************************************/
+
+/**
+ * Payment method callback: settings form.
+ */
+
+function commerce_dps_pxpay_settings_form($settings = NULL) {
+$form = array();
+
+  $settings = (array) $settings + array(
+    'commerce_dps_pxpay_userid' => variable_get('commerce_dps_pxpay_userid', 'Sample User'),
+    'commerce_dps_pxpay_key' => variable_get('commerce_dps_pxpay_key', 'Sample Key'),
+    'commerce_dps_pxpay_server' => variable_get('commerce_dps_pxpay_server', 'https://sec.paymentexpress.com/pxpay/pxaccess.aspx'),
+    'commerce_dps_pxpay_currency' => variable_get('commerce_dps_pxpay_currency', 'NZD'),
+    'commerce_dps_pxpay_cancel_return_url' => variable_get('commerce_dps_pxpay_cancel_return_url', 'cart'),
+    'commerce_dps_pxpay_refprefix' => variable_get('commerce_dps_pxpay_refprefix', 'Website Order'),
+  );  
+
+  $form['commerce_dps_pxpay_userid'] = array(
+    '#type' => 'textfield',
+    '#title' => t('PxPay User Id'),
+    '#description' => t('PxPay User Id that was issued by Payment Express.'),
+    '#default_value' => $settings['commerce_dps_pxpay_userid'],
+    '#required' => TRUE,
+  );
+  $form['commerce_dps_pxpay_key'] = array(
+    '#type' => 'textfield',
+    '#title' => t('PxPay key'),
+    '#description' => t('PxPay Key that was issued by Payment Express.'),
+    '#default_value' => $settings['commerce_dps_pxpay_key'],
+    '#required' => TRUE,
+  );
+  $form['commerce_dps_pxpay_server'] = array(
+    '#type' => 'select',
+    '#title' => t('PxPay server'),
+    '#description' => t('Sign up for and use a Sandbox account for testing.'),
+    '#options' => array(
+      'https://sec.paymentexpress.com/pxpay/pxaccess.aspx' => ('Live'),
+    ),
+    '#default_value' => $settings['commerce_dps_pxpay_server'],
+    '#required' => TRUE,
+  );
+  $form['commerce_dps_pxpay_currency'] = array(
+    '#type' => 'select',
+    '#title' => t('Currency code'),
+    '#description' => t('Transactions can only be processed in one of the listed currencies.'),
+    '#options' => _commerce_dps_pxpay_currency_array(),
+    '#default_value' => $settings['commerce_dps_pxpay_currency'],
+  );
+  $form['commerce_dps_pxpay_cancel_return_url'] = array(
+    '#type' => 'textfield',
+    '#title' => t('Cancel return URL'),
+    '#description' => t('Specify the path customers who cancel their DPS PxPay payment will be directed to when they return to your site.'),
+    '#default_value' => $settings['commerce_dps_pxpay_cancel_return_url'],
+    '#size' => 32,
+    '#field_prefix' => url(NULL, array('absolute' => TRUE)) . (variable_get('clean_url', 0) ? '' : '?q='),
+  );
+  $form['commerce_dps_pxpay_refprefix'] = array(
+    '#type' => 'textfield',
+    '#title' => t('Merchant Reference Prefix'),
+    '#description' => t('Added before order number sent to DPS, ie Website Order #1234'),
+    '#default_value' => $settings['commerce_dps_pxpay_refprefix'],
+    '#required' => TRUE,
+  );
+  
+  return $form;
+}
+
 
 /**
  * Payment method callback: checkout form.
