@@ -138,23 +138,32 @@ function commerce_dps_pxpay_submit_form($payment_method, $pane_values, $checkout
 }
 
 /**
- * Payment method callback: checkout form validation.
- */
-function commerce_dps_pxpay_submit_form_validate($payment_method, $pane_form, $pane_values, $order, $form_parents = array()) {
-  // Make sure that it's possible to use the DPS payment gateway.
-  $commerce_dps_pxpay_userid = variable_get('commerce_dps_pxpay_userid');
-  $commerce_dps_pxpay_key = variable_get('commerce_dps_pxpay_key');
-  if (empty($commerce_dps_pxpay_userid) || empty($commerce_dps_pxpay_key)) {
-    drupal_set_message(t('The DPS payment gateway cannot be used at this time'), 'error');
-    // Return FALSE to stop the submission flow.
-    return FALSE;
-  }
-}
-
-/**
  * Implements hook_redirect_form().
  */
 function commerce_dps_pxpay_redirect_form($form, &$form_state, $order, $payment_method) {
+  // Return an error if the DPS payment gateway userid and key aren't configured.
+  if (empty($payment_method['settings']['commerce_dps_pxpay_userid']) || 
+  empty($payment_method['settings']['commerce_dps_pxpay_key'])) {
+    drupal_set_message(t('The DPS payment gateway cannot be used at this time'), 'error');
+    return array();
+  }
+
+  $settings = array(
+    // Return to the previous page when payment is canceled
+    'cancel_return' => url('checkout/' . $order->order_id . '/payment/back/' . $order->data['payment_redirect_key'], array('absolute' => TRUE)),
+
+    // Return to the payment redirect page for processing successful payments
+    'return' => url('checkout/' . $order->order_id . '/payment/return/' . $order->data['payment_redirect_key'], array('absolute' => TRUE)),
+
+    // Specify the current payment method instance ID in the notify_url
+    'payment_method' => $payment_method['instance_id'],
+  );
+
+  return commerce_dps_pxpay_order_form($form, $form_state, $order, $payment_method['settings'] + $settings);
+}
+
+
+function commerce_dps_pxpay_order_form($form, &$form_state, $order, $payment_method) {
   
   include('PxPay_Curl.inc');
 
