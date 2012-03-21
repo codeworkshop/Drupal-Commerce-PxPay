@@ -10,11 +10,6 @@
  * Hook Functions (Drupal)
  ******************************************************************************/
 
-// Make sure DPS always has access to send IPNs.
-function commerce_dps_pxpay_log_access() {
-  return TRUE;
-}
-
 /**
  * Implementation of hook_perm().
  */
