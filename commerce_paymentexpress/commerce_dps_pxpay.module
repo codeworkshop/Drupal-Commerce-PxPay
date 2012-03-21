@@ -162,79 +162,53 @@ function commerce_dps_pxpay_redirect_form($form, &$form_state, $order, $payment_
   return commerce_dps_pxpay_order_form($form, $form_state, $order, $payment_method['settings'] + $settings);
 }
 
-
-function commerce_dps_pxpay_order_form($form, &$form_state, $order, $payment_method) {
+function commerce_dps_pxpay_order_form($form, &$form_state, $order, $settings) {
   
   include('PxPay_Curl.inc');
+  
+  $wrapper = entity_metadata_wrapper('commerce_order', $order);
 
-  $pxpay = new PxPay_Curl(
-    variable_get('commerce_dps_pxpay_server', 'https://sec.paymentexpress.com/pxpay/pxaccess.aspx'),
-    variable_get('commerce_dps_pxpay_userid', ''),
-    variable_get('commerce_dps_pxpay_key', '')
-  );
-
+  // Ensure a default value for the payment_method setting.
+  $settings += array('payment_method' => '');
+  
+  $PxPay_Url    = "https://sec.paymentexpress.com/pxpay/pxaccess.aspx";
+  $PxPay_Userid = "CodeWorkshop_dev"; #Important! Update with your UserId
+  $PxPay_Key    =  "4ae5c31e9bce5749ca489c2b6b591564932f072416ad5070be7cd163fa4f599c"; #Important! Update with your Key
+  
+  $pxpay = new PxPay_Curl( $PxPay_Url, $PxPay_Userid, $PxPay_Key );
+  
+  // $pxpay = new PxPay_Curl(
+  //   variable_get('commerce_dps_pxpay_server', 'https://sec.paymentexpress.com/pxpay/pxaccess.aspx'),
+  //   variable_get('commerce_dps_pxpay_userid', ''),
+  //   variable_get('commerce_dps_pxpay_key', '')
+  // );
+  
   $request = new PxPayRequest();
 
   # the following variables are read from the form
-  $merchant_reference = variable_get('commerce_dps_pxpay_refprefix', 'Website Order') ." #". $order->order_number;
+  $merchant_reference = "Website Order #". $order->order_number;
+  $amount = $wrapper->commerce_order_total->amount->value();
   #Generate a unique identifier for the transaction
   $txn_id = uniqid($order->order_number);
   // $order->data['pxpay_txnid'] = $txn_id;
 
-  $failure_url = url('commerce_dps_pxpay/'.$order->order_number.'/cancel', array('absolute' => TRUE));
-  $success_url = url('commerce_dps_pxpay/'.$order->order_number.'/complete', array('absolute' => TRUE));
+  $failure_url = $settings['cancel_return'];
+  $success_url = $settings['return'];
 
-  // $data1 = $order->billing_name;
+  // Load customer profiles.
+  $profile1 = commerce_customer_profile_load($order->commerce_customer_billing[LANGUAGE_NONE][0]['profile_id']);
+  // $profile2 = commerce_customer_profile_load($order->commerce_customer_delivery[LANGUAGE_NONE][0]['profile_id']);
+
+  // Get user billing name.
+  // $data1 = $profile->commerce_customer_name[LANGUAGE_NONE][0];
   $data1 = 'Test Data 1';
 
-  // $billing_country = commerce_get_country_data(array('country_id' => $order->billing_country));
-  // if (is_array($billing_country)) {
-  //   $billing_country = $billing_country[0]['country_iso_code_2'];
-  // }
-  // else {
-  //   $billing_country = FALSE;
-  // }
-
-  // $delivery_country = uc_get_country_data(array('country_id' => $order->delivery_country));
-  // if (is_array($delivery_country)) {
-  //   $delivery_country = $delivery_country[0]['country_iso_code_2'];
-  // } else {
-  //   $delivery_country = FALSE;
-  // }
-
-  // $data2 = array('Billing:');
-  // if ($order->billing_street1) {
-  //   $data2[] = $order->billing_street1;
-  // }
-  // if ($order->billing_street2) {
-  //   $data2[] = $order->billing_street2;
-  // }
-  // if ($order->billing_city) {
-  //   $data2[] = $order->billing_city;
-  // }
-  // if ($order->billing_country) {
-  //   $data2[] = $order->billing_country;
-  // }
-  // $data2 = implode(' ', $data2);
-  $data2 = 'Test Data 2';
-
-  // $data3 = array('Delivery:');
-  // if ($order->delivery_street1) {
-  //   $data3[] = $order->delivery_street1;
-  // }
-  // if ($order->delivery_street2) {
-  //   $data3[] = $order->delivery_street2;
-  // }
-  // if ($order->delivery_city) {
-  //   $data3[] = $order->delivery_city;
-  // }
-  // if ($order->delivery_country) {
-  //   $data3[] = $order->delivery_country;
-  // }
-  // $data3 = implode(' ', $data3);
-  $data3 = 'Test Data 3';
+  // Get user billing address.
+  $data2 = $profile->commerce_customer_address[LANGUAGE_NONE][0];
   
-  $amount = commerce_currency_amount_to_decimal($order->commerce_order_total['und'][0]['amount']);
+  // Get user delivery address.
+  // $data2 = $profile->commerce_customer_address[LANGUAGE_NONE][0];
+  $data3 = 'Test Data 3';
 
   // Set PxPay properties
   $request->setMerchantReference($merchant_reference);
@@ -259,22 +233,14 @@ function commerce_dps_pxpay_order_form($form, &$form_state, $order, $payment_met
   $url = $response->get_element_text("URI");
   $valid = $response->get_attribute("valid");
 
-  commerce_order_save($order);
+  $form['#action'] = $url;
 
-  // Redirect to payment page
-  if ($valid) {
-    // uc_order_comment_save($order->order_id, 0, t('Redirecting to DPS Px Pay.'), 'admin');
-    drupal_goto($url);
-  }
-  else {
-    unset($_SESSION['cart_order']);
-    drupal_set_message(t("We're sorry.  An error occurred while processing your order that prevents us from completing it at this time. Please contact us and we will resolve the issue as soon as possible."), 'error');
-    watchdog('commerce_dps_pxpay', 'Transaction request failed. Order ID: @orderid. XML: @xml', array('@orderid' => $order->order_id, '@xml' => $response->xml_), WATCHDOG_ERROR);
+  $form['submit'] = array(
+    '#type' => 'submit',
+    '#value' => t('Proceed to DPS'),
+  );
 
-    drupal_goto(variable_get('commerce_dps_pxpay_cancel_return_url', 'cart'));
-  }
-
-  return;
+  return $form;
 }
 
 /*******************************************************************************
