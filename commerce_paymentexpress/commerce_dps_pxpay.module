@@ -121,13 +121,6 @@ $form = array();
  * Payment method callback: checkout form.
  */
 function commerce_dps_pxpay_submit_form($payment_method, $pane_values, $checkout_pane, $order) {
-  $form = array();
-
-  // Merge in values from the order.
-  if (!empty($order->data['commerce_dps_pxpay'])) {
-    $pane_values += $order->data['commerce_dps_pxpay'];
-  }
-
   $form['commerce_dps_pxpay_logo'] = array(
     '#markup' => l(
       theme_image(array(
@@ -156,14 +149,6 @@ function commerce_dps_pxpay_submit_form_validate($payment_method, $pane_form, $p
     // Return FALSE to stop the submission flow.
     return FALSE;
   }
-}
-
-/**
- * Payment method callback: checkout form submission.
- */
-function commerce_dps_pxpay_submit_form_submit($payment_method, $pane_form, $pane_values, $order, $charge) {
-  drupal_session_start();
-  $_SESSION['commerce_dps_pxpay']['amount'] = $charge['amount'];
 }
 
 /**
