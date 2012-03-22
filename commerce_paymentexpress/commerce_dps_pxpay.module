@@ -176,17 +176,11 @@ function commerce_dps_pxpay_order_form($form, &$form_state, $order, $settings) {
   // Ensure a default value for the payment_method setting.
   $settings += array('payment_method' => '');
   
-  $PxPay_Url    = "https://sec.paymentexpress.com/pxpay/pxaccess.aspx";
-  $PxPay_Userid = "CodeWorkshop_dev"; #Important! Update with your UserId
-  $PxPay_Key    =  "4ae5c31e9bce5749ca489c2b6b591564932f072416ad5070be7cd163fa4f599c"; #Important! Update with your Key
-  
-  $pxpay = new PxPay_Curl( $PxPay_Url, $PxPay_Userid, $PxPay_Key );
-  
-  // $pxpay = new PxPay_Curl(
-  //   variable_get('commerce_dps_pxpay_server', 'https://sec.paymentexpress.com/pxpay/pxaccess.aspx'),
-  //   variable_get('commerce_dps_pxpay_userid', ''),
-  //   variable_get('commerce_dps_pxpay_key', '')
-  // );
+  $pxpay = new PxPay_Curl(
+    COMMERCE_DPS_PXPAY_SERVER,
+    COMMERCE_DPS_PXPAY_USERID,
+    COMMERCE_DPS_PXPAY_KEY
+  );
   
   $request = new PxPayRequest();
 
