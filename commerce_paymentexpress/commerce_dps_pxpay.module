@@ -177,15 +177,15 @@ function commerce_dps_pxpay_order_form($form, &$form_state, $order, $settings) {
   $settings += array('payment_method' => '');
   
   $pxpay = new PxPay_Curl(
-    COMMERCE_DPS_PXPAY_SERVER,
-    COMMERCE_DPS_PXPAY_USERID,
-    COMMERCE_DPS_PXPAY_KEY
+    $settings['commerce_dps_pxpay_server'],
+    $settings['commerce_dps_pxpay_userid'],
+    $settings['commerce_dps_pxpay_key']
   );
   
   $request = new PxPayRequest();
 
   # the following variables are read from the form
-  $merchant_reference = "Website Order #". $order->order_number;
+  $merchant_reference = $settings['commerce_dps_pxpay_refprefix'] ." #". $order->order_number;
   $amount = $wrapper->commerce_order_total->amount->value();
   #Generate a unique identifier for the transaction
   $txn_id = uniqid($order->order_number);
@@ -203,7 +203,8 @@ function commerce_dps_pxpay_order_form($form, &$form_state, $order, $settings) {
   $data1 = 'Test Data 1';
 
   // Get user billing address.
-  $data2 = $profile->commerce_customer_address[LANGUAGE_NONE][0];
+  // $data2 = $profile->commerce_customer_address[LANGUAGE_NONE][0];
+  $data2 = 'Test Data 2';
   
   // Get user delivery address.
   // $data2 = $profile->commerce_customer_address[LANGUAGE_NONE][0];
@@ -216,7 +217,7 @@ function commerce_dps_pxpay_order_form($form, &$form_state, $order, $settings) {
   $request->setTxnData2($data2);
   $request->setTxnData3($data3);
   $request->setTxnType("Purchase");
-  $request->setCurrencyInput(variable_get('commerce_dps_pxpay_currency', 'NZD'));
+  $request->setCurrencyInput($settings['commerce_dps_pxpay_currency']);
   $request->setEmailAddress($order->mail);
   $request->setUrlFail($failure_url);  # can be a dedicated failure page
   $request->setUrlSuccess($success_url);  # can be a dedicated success page
