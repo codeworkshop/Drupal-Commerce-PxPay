@@ -1,7 +1,7 @@
 name        = "Commerce DPS PxPay"
 description = "Integrates the DPS PxPay gateway with Drupal Commerce payment module."
 core        = "7.x"
-version     = VERSION
+version     = "7.x-1.x-dev"
 package     = "Commerce (contrib)"
 
 configure = admin/commerce/config/dpspxpay

@@ -11,9 +11,9 @@
 define('COMMERCE_DPS_PXPAY_USERID', 'Sample User');
 define('COMMERCE_DPS_PXPAY_KEY', 'Sample Key');
 define('COMMERCE_DPS_PXPAY_SERVER', 'https://sec.paymentexpress.com/pxpay/pxaccess.aspx');
-define('COMMERCE_DPS_PXPAY_CURRENCY', 'NZD'),
-define('COMMERCE_DPS_PXPAY_CANCEL_RETURN_URL', 'cart'),
-define('COMMERCE_DPS_PXPAY_REFPREFIX', 'Website Order'),
+define('COMMERCE_DPS_PXPAY_CURRENCY', 'NZD');
+define('COMMERCE_DPS_PXPAY_CANCEL_RETURN_URL', 'cart');
+define('COMMERCE_DPS_PXPAY_REFPREFIX', 'Website Order');
 
 
 /*******************************************************************************
@@ -45,7 +45,7 @@ function commerce_dps_pxpay_commerce_payment_method_info() {
       'description' => t('Provides integration with the DPS PxPay payment gateway.'),
       'terminal' => FALSE,
       'offsite' => TRUE,
-      'offsite_autoredirect' => TRUE,
+      'active' => TRUE,
     ),
   );
 }
@@ -68,7 +68,7 @@ $form = array();
     'commerce_dps_pxpay_server' => COMMERCE_DPS_PXPAY_SERVER,
     'commerce_dps_pxpay_currency' => COMMERCE_DPS_PXPAY_CURRENCY,
     'commerce_dps_pxpay_cancel_return_url' => COMMERCE_DPS_PXPAY_CANCEL_RETURN_URL,
-    'commerce_dps_pxpay_refprefix' => COMMERCE_DPS_PXPAY_REFPREFIX,
+    'commerce_dps_pxpay_refprefix' => COMMERCE_DPS_PXPAY_REFPREFIX
   );  
 
   $form['commerce_dps_pxpay_userid'] = array(
@@ -129,7 +129,7 @@ function commerce_dps_pxpay_submit_form($payment_method, $pane_values, $checkout
   $form['commerce_dps_pxpay_logo'] = array(
     '#markup' => l(
       theme_image(array(
-        'path' => drupal_get_path('module', 'commerce_paymentexpress') . 'sites/all/modules/commerce_paymentexpress/images/dps_paymentexpress_small.png',
+        'path' => drupal_get_path('module', 'commerce_paymentexpress') . '/images/dps_paymentexpress_small.png',
         'alt' => t('DPS - Payment Gateway by Payment Express.'),
         'title' => t('DPS - Payment Gateway by Payment Express.'),
         'attributes' => array('style' => 'float: left; margin: 1em 1em 1em 1.5em;'),
@@ -186,7 +186,7 @@ function commerce_dps_pxpay_order_form($form, &$form_state, $order, $settings) {
 
   # the following variables are read from the form
   $merchant_reference = $settings['commerce_dps_pxpay_refprefix'] ." #". $order->order_number;
-  $amount = $wrapper->commerce_order_total->amount->value();
+  $amount = commerce_currency_amount_to_decimal($order->commerce_order_total['und'][0]['amount']);
   #Generate a unique identifier for the transaction
   $txn_id = uniqid($order->order_number);
   // $order->data['pxpay_txnid'] = $txn_id;
@@ -233,14 +233,19 @@ function commerce_dps_pxpay_order_form($form, &$form_state, $order, $settings) {
   $url = $response->get_element_text("URI");
   $valid = $response->get_attribute("valid");
 
-  $form['#action'] = $url;
+  // $form['#action'] = $url;
 
-  $form['submit'] = array(
-    '#type' => 'submit',
-    '#value' => t('Proceed to DPS'),
-  );
+  // $form['submit'] = array(
+  //   '#type' => 'submit',
+  //   '#value' => t('Proceed to DPS'),
+  // );
+  
+  if ($valid) {
+    drupal_goto($url);
+  }
 
-  return $form;
+  return;
+  
 }
 
 /*******************************************************************************
