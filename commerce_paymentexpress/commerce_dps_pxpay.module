@@ -5,6 +5,16 @@
  * Integrates the DPS PxPay gateway with Drupal Commerce!
  */
 
+/*******************************************************************************
+ * DPS Definitions
+ ******************************************************************************/
+define('COMMERCE_DPS_PXPAY_USERID', 'Sample User');
+define('COMMERCE_DPS_PXPAY_KEY', 'Sample Key');
+define('COMMERCE_DPS_PXPAY_SERVER', 'https://sec.paymentexpress.com/pxpay/pxaccess.aspx');
+define('COMMERCE_DPS_PXPAY_CURRENCY', 'NZD'),
+define('COMMERCE_DPS_PXPAY_CANCEL_RETURN_URL', 'cart'),
+define('COMMERCE_DPS_PXPAY_REFPREFIX', 'Website Order'),
+
 
 /*******************************************************************************
  * Hook Functions (Drupal)
@@ -53,12 +63,12 @@ function commerce_dps_pxpay_settings_form($settings = NULL) {
 $form = array();
 
   $settings = (array) $settings + array(
-    'commerce_dps_pxpay_userid' => variable_get('commerce_dps_pxpay_userid', 'Sample User'),
-    'commerce_dps_pxpay_key' => variable_get('commerce_dps_pxpay_key', 'Sample Key'),
-    'commerce_dps_pxpay_server' => variable_get('commerce_dps_pxpay_server', 'https://sec.paymentexpress.com/pxpay/pxaccess.aspx'),
-    'commerce_dps_pxpay_currency' => variable_get('commerce_dps_pxpay_currency', 'NZD'),
-    'commerce_dps_pxpay_cancel_return_url' => variable_get('commerce_dps_pxpay_cancel_return_url', 'cart'),
-    'commerce_dps_pxpay_refprefix' => variable_get('commerce_dps_pxpay_refprefix', 'Website Order'),
+    'commerce_dps_pxpay_userid' => COMMERCE_DPS_PXPAY_USERID,
+    'commerce_dps_pxpay_key' => COMMERCE_DPS_PXPAY_KEY,
+    'commerce_dps_pxpay_server' => COMMERCE_DPS_PXPAY_SERVER,
+    'commerce_dps_pxpay_currency' => COMMERCE_DPS_PXPAY_CURRENCY,
+    'commerce_dps_pxpay_cancel_return_url' => COMMERCE_DPS_PXPAY_CANCEL_RETURN_URL,
+    'commerce_dps_pxpay_refprefix' => COMMERCE_DPS_PXPAY_REFPREFIX,
   );  
 
   $form['commerce_dps_pxpay_userid'] = array(
