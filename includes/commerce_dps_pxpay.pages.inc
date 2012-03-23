@@ -9,7 +9,7 @@
 
 // Handles a completed PxPay sale.
 function commerce_dps_pxpay_complete($order, $payment_method) {
- 
+
   include('PxPay_Curl.inc');
 
   $pxpay = new PxPay_Curl(
@@ -23,7 +23,7 @@ function commerce_dps_pxpay_complete($order, $payment_method) {
   // which encapsulates all the response data
   $rsp = $pxpay->getResponse($enc_hex);
 
-  
+
   // the following are the fields available in the PxPayResponse object
   $order->data['payment_details']['pxpay_Success'] = $rsp->getSuccess();   # =1 when request succeeds
   $payment_amount = $order->data['payment_details']['pxpay_AmountSettlement']  = $rsp->getAmountSettlement();
@@ -58,7 +58,7 @@ function commerce_dps_pxpay_complete($order, $payment_method) {
 
     // Save the transaction information.
     commerce_payment_transaction_save($transaction);
-  
+
     commerce_payment_redirect_pane_next_page($order);
     watchdog('commerce_dps_pxpay', 'DPS processed for Order @order_number with ID @txn_id.', array('@txn_id' => $txn_id], '@order_number' => $order->order_number), WATCHDOG_INFO);
   }

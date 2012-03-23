@@ -58,9 +58,8 @@ function commerce_dps_pxpay_commerce_payment_method_info() {
 /**
  * Payment method callback: settings form.
  */
-
 function commerce_dps_pxpay_settings_form($settings = NULL) {
-$form = array();
+  $form = array();
 
   $settings = (array) $settings + array(
     'commerce_dps_pxpay_userid' => COMMERCE_DPS_PXPAY_USERID,
@@ -69,7 +68,7 @@ $form = array();
     'commerce_dps_pxpay_currency' => COMMERCE_DPS_PXPAY_CURRENCY,
     'commerce_dps_pxpay_cancel_return_url' => COMMERCE_DPS_PXPAY_CANCEL_RETURN_URL,
     'commerce_dps_pxpay_refprefix' => COMMERCE_DPS_PXPAY_REFPREFIX
-  );  
+  );
 
   $form['commerce_dps_pxpay_userid'] = array(
     '#type' => 'textfield',
@@ -78,6 +77,7 @@ $form = array();
     '#default_value' => $settings['commerce_dps_pxpay_userid'],
     '#required' => TRUE,
   );
+
   $form['commerce_dps_pxpay_key'] = array(
     '#type' => 'textfield',
     '#title' => t('PxPay key'),
@@ -117,7 +117,7 @@ $form = array();
     '#default_value' => $settings['commerce_dps_pxpay_refprefix'],
     '#required' => TRUE,
   );
-  
+
   return $form;
 }
 
@@ -147,7 +147,7 @@ function commerce_dps_pxpay_submit_form($payment_method, $pane_values, $checkout
  */
 function commerce_dps_pxpay_redirect_form($form, &$form_state, $order, $payment_method) {
   // Return an error if the DPS payment gateway userid and key aren't configured.
-  if (empty($payment_method['settings']['commerce_dps_pxpay_userid']) || 
+  if (empty($payment_method['settings']['commerce_dps_pxpay_userid']) ||
   empty($payment_method['settings']['commerce_dps_pxpay_key'])) {
     drupal_set_message(t('The DPS payment gateway cannot be used at this time'), 'error');
     return array();
@@ -168,20 +168,20 @@ function commerce_dps_pxpay_redirect_form($form, &$form_state, $order, $payment_
 }
 
 function commerce_dps_pxpay_order_form($form, &$form_state, $order, $settings) {
-  
+
   include('PxPay_Curl.inc');
-  
+
   $wrapper = entity_metadata_wrapper('commerce_order', $order);
 
   // Ensure a default value for the payment_method setting.
   $settings += array('payment_method' => '');
-  
+
   $pxpay = new PxPay_Curl(
     $settings['commerce_dps_pxpay_server'],
     $settings['commerce_dps_pxpay_userid'],
     $settings['commerce_dps_pxpay_key']
   );
-  
+
   $request = new PxPayRequest();
 
   # the following variables are required for the transaction
@@ -204,7 +204,7 @@ function commerce_dps_pxpay_order_form($form, &$form_state, $order, $settings) {
   // Get user billing address.
   // $data2 = $profile->commerce_customer_address[LANGUAGE_NONE][0];
   $data2 = 'Test Data 2';
-  
+
   // Get user delivery address.
   // $data2 = $profile->commerce_customer_address[LANGUAGE_NONE][0];
   $data3 = 'Test Data 3';
@@ -238,28 +238,31 @@ function commerce_dps_pxpay_order_form($form, &$form_state, $order, $settings) {
   //   '#type' => 'submit',
   //   '#value' => t('Proceed to DPS'),
   // );
-  
+
   if ($valid) {
     drupal_goto($url);
   }
 
   return;
-  
+
 }
 
 /**
  * Implements hook_redirect_form_validate
+ *
+ * // had "$payment_method['settings'] + $settings" as second param?
  */
-function commerce_dps_pxpay_redirect_form_validate($order, $payment_method['settings'] + $settings){
-  
+function commerce_dps_pxpay_redirect_form_validate($order, $settings){
+
+
   include('PxPay_Curl.inc');
-  
+
   $pxpay = new PxPay_Curl(
     $settings['commerce_dps_pxpay_server'],
     $settings['commerce_dps_pxpay_userid'],
     $settings['commerce_dps_pxpay_key']
   );
-  
+
   $enc_hex = $_GET["result"];
   // getResponse method in PxPay object returns PxPayResponse object
   // which encapsulates all the response data
@@ -284,7 +287,7 @@ function commerce_dps_pxpay_redirect_form_validate($order, $payment_method['sett
     $tokens->data['payment_details']['pxpay_ResponseText'] = $rsp->getResponseText();
 
     $merchant_reference = $settings['commerce_dps_pxpay_refprefix'] ." #". $order->order_number;
-    
+
     if ($tokens['pxpay_txnid'] != $rsp->getTxnId() ||
         $merchant_reference != $rsp->getMerchantReference() ||
         $rsp->getEmailAddress() != $order->mail) {
@@ -296,13 +299,13 @@ function commerce_dps_pxpay_redirect_form_validate($order, $payment_method['sett
     }
 
     commerce_dps_pxpay_form_transaction($payment_method, $order, $tokens, COMMERCE_PAYMENT_STATUS_SUCCESS);
-    
+
     } else {
-  
+
     commerce_dps_pxpay_form_transaction($payment_method, $order, $tokens, COMMERCE_PAYMENT_STATUS_PENDING);
-    
+
   }
-  
+
 }
 
 
@@ -328,7 +331,7 @@ function commerce_dps_pxpay_form_transaction($payment_method, $order, $tokens, $
       '@email' => $tokens['pxpay_EmailAddress'],
       '@authcode' => $tokens['pxpay_AuthCode'],
     );
-  
+
   commerce_payment_transaction_save($transaction);
 
 }
