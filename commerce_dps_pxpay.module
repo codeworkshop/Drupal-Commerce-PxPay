@@ -186,7 +186,8 @@ function commerce_dps_pxpay_order_form($form, &$form_state, $order, $settings) {
 
   # the following variables are required for the transaction
   $merchant_reference = $settings['commerce_dps_pxpay_refprefix'] ." #". $order->order_number;
-  $amount = commerce_currency_amount_to_decimal($order->commerce_order_total['und'][0]['amount']);
+  //dpm($order, 'order');
+  $amount = printf("%01.2f", $order->commerce_order_total['und'][0]['amount']);
   #Generate a unique identifier for the transaction
   $txn_id = uniqid($order->order_number);
 
@@ -252,8 +253,8 @@ function commerce_dps_pxpay_order_form($form, &$form_state, $order, $settings) {
  *
  * // had "$payment_method['settings'] + $settings" as second param?
  */
-function commerce_dps_pxpay_redirect_form_validate($order, $settings){
-
+function commerce_dps_pxpay_redirect_form_validate($order, $method){
+  $settings = $method['settings'];
 
   include('PxPay_Curl.inc');
 
@@ -288,8 +289,11 @@ function commerce_dps_pxpay_redirect_form_validate($order, $settings){
 
     $merchant_reference = $settings['commerce_dps_pxpay_refprefix'] ." #". $order->order_number;
 
-    if ($tokens['pxpay_txnid'] != $rsp->getTxnId() ||
-        $merchant_reference != $rsp->getMerchantReference() ||
+    // removed redundant check
+    // $tokens->data['payment_details']['pxpay_TxnId'] != $rsp->getTxnId()
+    // value is set @ line 287
+    // prob meant to check sth else
+    if ($merchant_reference != $rsp->getMerchantReference() ||
         $rsp->getEmailAddress() != $order->mail) {
       watchdog('commerce_dps_pxpay', 'DPS PxPay details do not match order details! Cart order ID: @cart_order', array('@cart_order' => $order->order->order_number), WATCHDOG_NOTICE);
 
@@ -317,19 +321,19 @@ function commerce_dps_pxpay_form_transaction($payment_method, $order, $tokens, $
 
   $transaction = commerce_payment_transaction_new('commerce_dps_pxpay', $order->order_id);
   $transaction->instance_id = $payment_method['instance_id'];
-  $transaction->amount = $tokens['pxpay_AmountSettlement'];
+  $transaction->amount = $tokens->data['payment_details']['pxpay_AmountSettlement'];
   $transaction->currency_code = $settings['commerce_dps_pxpay_currency'];
-  $transaction->remote_id = $tokens['pxpay_DpsTxnRef'];
+  $transaction->remote_id = $tokens->data['payment_details']['pxpay_DpsTxnRef'];
 
   // set a status for the payment - one of COMMERCE_PAYMENT_STATUS_SUCCESS, COMMERCE_PAYMENT_STATUS_PENDING or COMMERCE_PAYMENT_STATUS_FAILURE
   $transaction->status = $transaction_status;
   $transaction->message = 'Status @status, @statusdetail. Email: @vpstxid. Auth Code=@authcode.';
   $transaction->message_variables =
     array(
-      '@status' => $tokens['pxpay_Success'],
-      '@statusdetail' => $tokens['pxpay_ResponseText'],
-      '@email' => $tokens['pxpay_EmailAddress'],
-      '@authcode' => $tokens['pxpay_AuthCode'],
+      '@status' => $tokens->data['payment_details']['pxpay_Success'],
+      '@statusdetail' => $tokens->data['payment_details']['pxpay_ResponseText'],
+      '@email' => $tokens->data['payment_details']['pxpay_EmailAddress'],
+      '@authcode' => $tokens->data['payment_details']['pxpay_AuthCode'],
     );
 
   commerce_payment_transaction_save($transaction);
