@@ -15,23 +15,6 @@ define('COMMERCE_DPS_PXPAY_CURRENCY', 'NZD');
 define('COMMERCE_DPS_PXPAY_CANCEL_RETURN_URL', 'cart');
 define('COMMERCE_DPS_PXPAY_REFPREFIX', 'Website Order');
 
-
-/*******************************************************************************
- * Hook Functions (Drupal)
- ******************************************************************************/
-
-/**
- * Implementation of hook_perm().
- */
-function commerce_dps_pxpay_permission() {
-  return array(
-    'administer commerce dps pxpay' => array(
-      'title' => t('Administer Commerce DPS PXPay'),
-      'description' => t('Perform administration tasks for Commerce DPS PXPay'),
-    ));
-}
-
-
 /*******************************************************************************
  * Hook Functions (Drupal Commerce)
  ******************************************************************************/
@@ -168,84 +151,29 @@ function commerce_dps_pxpay_redirect_form($form, &$form_state, $order, $payment_
 }
 
 function commerce_dps_pxpay_order_form($form, &$form_state, $order, $settings) {
+  module_load_include('inc', 'commerce_dps_pxpay', 'commerce_dps_pxpay');
 
-  include('PxPay_Curl.inc');
-
-  $wrapper = entity_metadata_wrapper('commerce_order', $order);
-
-  // Ensure a default value for the payment_method setting.
-  $settings += array('payment_method' => '');
-
-  $pxpay = new PxPay_Curl(
-    $settings['commerce_dps_pxpay_server'],
-    $settings['commerce_dps_pxpay_userid'],
-    $settings['commerce_dps_pxpay_key']
+  $transaction = array(
+    'user_id'     => $settings['commerce_dps_pxpay_userid'],
+    'server'      => $settings['commerce_dps_pxpay_server'],
+    'key'         => $settings['commerce_dps_pxpay_key'],
+    'amount'      => $order->commerce_order_total['und'][0]['amount'] / 100,
+    'type'        => 'Purchase',
+    'txn_id'      => uniqid($order->order_number),
+    'reference'   => $settings['commerce_dps_pxpay_refprefix'] ." #". $order->order_number,
+    'currency'    => 'NZD',
+    'url_success' => $settings['return'],
+    'url_failure' => $settings['cancel_return'],
+    'email'       => $order->mail,
+    'log'         => TRUE,
   );
 
-  $request = new PxPayRequest();
-
-  # the following variables are required for the transaction
-  $merchant_reference = $settings['commerce_dps_pxpay_refprefix'] ." #". $order->order_number;
-  //dpm($order, 'order');
-  $amount = printf("%01.2f", $order->commerce_order_total['und'][0]['amount']);
-  #Generate a unique identifier for the transaction
-  $txn_id = uniqid($order->order_number);
-
-  $failure_url = $settings['cancel_return'];
-  $success_url = $settings['return'];
-
-  // Load customer profiles.
-  $profile1 = commerce_customer_profile_load($order->commerce_customer_billing[LANGUAGE_NONE][0]['profile_id']);
-  // $profile2 = commerce_customer_profile_load($order->commerce_customer_delivery[LANGUAGE_NONE][0]['profile_id']);
-
-  // Get user billing name.
-  // $data1 = $profile->commerce_customer_name[LANGUAGE_NONE][0];
-  $data1 = 'Test Data 1';
-
-  // Get user billing address.
-  // $data2 = $profile->commerce_customer_address[LANGUAGE_NONE][0];
-  $data2 = 'Test Data 2';
-
-  // Get user delivery address.
-  // $data2 = $profile->commerce_customer_address[LANGUAGE_NONE][0];
-  $data3 = 'Test Data 3';
-
-  // Set PxPay properties
-  $request->setMerchantReference($merchant_reference);
-  $request->setAmountInput($amount);
-  $request->setTxnData1($data1);
-  $request->setTxnData2($data2);
-  $request->setTxnData3($data3);
-  $request->setTxnType("Purchase");
-  $request->setCurrencyInput($settings['commerce_dps_pxpay_currency']);
-  $request->setEmailAddress($order->mail);
-  $request->setUrlFail($failure_url);  # can be a dedicated failure page
-  $request->setUrlSuccess($success_url);  # can be a dedicated success page
-  $request->setTxnId($txn_id);
-
-  // Call makeRequest function to obtain input XML
-  $request_string = $pxpay->makeRequest($request);
-
-  // Obtain output XML
-  $response = new MifMessage($request_string);
-
-  // Parse output XML
-  $url = $response->get_element_text("URI");
-  $valid = $response->get_attribute("valid");
-
-  // $form['#action'] = $url;
-
-  // $form['submit'] = array(
-  //   '#type' => 'submit',
-  //   '#value' => t('Proceed to DPS'),
-  // );
-
-  if ($valid) {
+  if ($url = commerce_dps_pxpay_generate_request($transaction)) {
     drupal_goto($url);
   }
-
-  return;
-
+  else {
+    watchdog('commerce_dps_pxpay', 'Unable to generate DPS request with settings: @settings', array('@settings' => print_r($settings,1)), WATCHDOG_DEBUG);
+  }
 }
 
 /**
