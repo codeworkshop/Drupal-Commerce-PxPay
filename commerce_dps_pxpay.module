@@ -42,6 +42,7 @@ function commerce_dps_pxpay_commerce_payment_method_info() {
  * Payment method callback: settings form.
  */
 function commerce_dps_pxpay_settings_form($settings = NULL) {
+  module_load_include('inc', 'commerce_dps_pxpay', 'commerce_dps_pxpay');
   $form = array();
 
   $settings = (array) $settings + array(
@@ -82,7 +83,7 @@ function commerce_dps_pxpay_settings_form($settings = NULL) {
     '#type' => 'select',
     '#title' => t('Currency code'),
     '#description' => t('Transactions can only be processed in one of the listed currencies.'),
-    '#options' => _commerce_dps_pxpay_currency_array(),
+    '#options' => commerce_dps_pxpay_currencies(),
     '#default_value' => $settings['commerce_dps_pxpay_currency'],
   );
   $form['commerce_dps_pxpay_cancel_return_url'] = array(
@@ -181,63 +182,53 @@ function commerce_dps_pxpay_order_form($form, &$form_state, $order, $settings) {
  *
  * // had "$payment_method['settings'] + $settings" as second param?
  */
-function commerce_dps_pxpay_redirect_form_validate($order, $method){
-  $settings = $method['settings'];
+function commerce_dps_pxpay_redirect_form_validate($order, $payment_method){
+  $settings = $payment_method['settings'];
 
-  include('PxPay_Curl.inc');
+  module_load_include('inc', 'commerce_dps_pxpay', 'commerce_dps_pxpay');
 
-  $pxpay = new PxPay_Curl(
-    $settings['commerce_dps_pxpay_server'],
-    $settings['commerce_dps_pxpay_userid'],
-    $settings['commerce_dps_pxpay_key']
+  $transaction = array(
+    'server' => $settings['commerce_dps_pxpay_server'],
+    'user_id' => $settings['commerce_dps_pxpay_userid'],
+    'key' => $settings['commerce_dps_pxpay_key'],
+    'result' => $_GET['result'],
+    'log' => TRUE,
   );
 
-  $enc_hex = $_GET["result"];
-  // getResponse method in PxPay object returns PxPayResponse object
-  // which encapsulates all the response data
-  $rsp = $pxpay->getResponse($enc_hex);
+  $tokens->data['payment_details'] = array();
 
-  if ($rsp->getSuccess() == "1") {
-    // the following are the fields available in the PxPayResponse object
-    $tokens->data['payment_details']['pxpay_Success'] = $rsp->getSuccess();   # =1 when request succeeds
-    $tokens->data['payment_details']['pxpay_AmountSettlement']  = $rsp->getAmountSettlement();
-    $tokens->data['payment_details']['pxpay_AuthCode'] = $rsp->getAuthCode();  # from bank
-    $tokens->data['payment_details']['pxpay_CardName'] = $rsp->getCardName();  # eg "Visa"
-    $tokens->data['payment_details']['pxpay_CardNumber'] = $rsp->getCardNumber(); # Truncated card number
-    $tokens->data['payment_details']['pxpay_CardHolderName'] = $rsp->getCardHolderName();
+  $response = commerce_dps_pxpay_process_response($transaction);
 
-    $tokens->data['payment_details']['pxpay_DateExpiry'] = $rsp->getDateExpiry();
-    $txn_id = $tokens->data['payment_details']['pxpay_DpsTxnRef'] = $rsp->getDpsTxnRef();
-    $tokens->data['payment_details']['pxpay_TxnType'] = $rsp->getTxnType();
-    $tokens->data['payment_details']['pxpay_ClientInfo'] = $rsp->getClientInfo(); # The IP address of the user who submitted the transaction
-    $tokens->data['payment_details']['pxpay_TxnId'] = $rsp->getTxnId();
-    $tokens->data['payment_details']['pxpay_EmailAddress'] = $rsp->getEmailAddress();
-    $tokens->data['payment_details']['pxpay_MerchantReference'] = $rsp->getMerchantReference();
-    $tokens->data['payment_details']['pxpay_ResponseText'] = $rsp->getResponseText();
+  // DPS validation
+  if ($response['Success'] != "1") {
+    // not a success
+    commerce_dps_pxpay_form_transaction($payment_method, $order, $tokens, COMMERCE_PAYMENT_STATUS_FAILURE);
+    watchdog('commerce_dps_pxpay', 'DPS PxPay transaction failed validation. Cart order ID: @cart_order', array('@cart_order' => $order->order->order_number), WATCHDOG_NOTICE);
 
-    $merchant_reference = $settings['commerce_dps_pxpay_refprefix'] ." #". $order->order_number;
-
-    // removed redundant check
-    // $tokens->data['payment_details']['pxpay_TxnId'] != $rsp->getTxnId()
-    // value is set @ line 287
-    // prob meant to check sth else
-    if ($merchant_reference != $rsp->getMerchantReference() ||
-        $rsp->getEmailAddress() != $order->mail) {
-      watchdog('commerce_dps_pxpay', 'DPS PxPay details do not match order details! Cart order ID: @cart_order', array('@cart_order' => $order->order->order_number), WATCHDOG_NOTICE);
-
-      drupal_set_message(t('The details of your DPS PxPay payment do not match your order. Please contact us for assistance. Reference Order Id: @orderid', array('@orderid' => $order->order_number)));
-      drupal_goto($settings['commerce_dps_pxpay_cancel_return_url']);
-      return;
-    }
-
-    commerce_dps_pxpay_form_transaction($payment_method, $order, $tokens, COMMERCE_PAYMENT_STATUS_SUCCESS);
-
-    } else {
-
-    commerce_dps_pxpay_form_transaction($payment_method, $order, $tokens, COMMERCE_PAYMENT_STATUS_PENDING);
-
+    drupal_set_message(t('The transaction failed validation. Please contact us for assistance. Reference Order Id: @orderid', array('@orderid' => $order->order_number)));
+    drupal_goto($settings['commerce_dps_pxpay_cancel_return_url']);
   }
 
+  foreach($response as $k => $v) {
+    $tokens->data['payment_details']['pxpay_'.$k] = $v;
+  }
+
+  // Local validation.
+  $merchant_reference = $settings['commerce_dps_pxpay_refprefix'] ." #". $order->order_number;
+  if ($merchant_reference != $response['MerchantReference'] ||
+      $order->mail != $response['EmailAddress']) {
+    watchdog('commerce_dps_pxpay', 'DPS PxPay details do not match order details! Cart order ID: @cart_order', array('@cart_order' => $order->order_number), WATCHDOG_NOTICE);
+
+    drupal_set_message(t('The details of your DPS PxPay payment do not match your order. Please contact us for assistance. Reference Order Id: @orderid', array('@orderid' => $order->order_number)));
+    commerce_dps_pxpay_form_transaction($payment_method, $order, $tokens, COMMERCE_PAYMENT_STATUS_FAILURE);
+    drupal_goto($settings['commerce_dps_pxpay_cancel_return_url']);
+  }
+
+  watchdog('commerce_dps_pxpay', 'DPS PxPay transaction succeeded. Cart order ID: @cart_order', array('@cart_order' => $order->order_number), WATCHDOG_NOTICE);
+
+  drupal_set_message(t('Transaction succeeded. Reference Order Id: @orderid', array('@orderid' => $order->order_number)));
+  // Success.
+  commerce_dps_pxpay_form_transaction($payment_method, $order, $tokens, COMMERCE_PAYMENT_STATUS_SUCCESS);
 }
 
 
@@ -246,6 +237,7 @@ function commerce_dps_pxpay_redirect_form_validate($order, $method){
  * Create a transaction and associate it with an order
  */
 function commerce_dps_pxpay_form_transaction($payment_method, $order, $tokens, $transaction_status) {
+  $settings = $payment_method['settings'];
 
   $transaction = commerce_payment_transaction_new('commerce_dps_pxpay', $order->order_id);
   $transaction->instance_id = $payment_method['instance_id'];
@@ -258,44 +250,12 @@ function commerce_dps_pxpay_form_transaction($payment_method, $order, $tokens, $
   $transaction->message = 'Status @status, @statusdetail. Email: @vpstxid. Auth Code=@authcode.';
   $transaction->message_variables =
     array(
-      '@status' => $tokens->data['payment_details']['pxpay_Success'],
+      '@status'       => $tokens->data['payment_details']['pxpay_Success'],
       '@statusdetail' => $tokens->data['payment_details']['pxpay_ResponseText'],
-      '@email' => $tokens->data['payment_details']['pxpay_EmailAddress'],
-      '@authcode' => $tokens->data['payment_details']['pxpay_AuthCode'],
+      '@email'        => $tokens->data['payment_details']['pxpay_EmailAddress'],
+      '@authcode'     => $tokens->data['payment_details']['pxpay_AuthCode'],
     );
 
   commerce_payment_transaction_save($transaction);
 
-}
-
-
-/*******************************************************************************
- * Module and Helper Functions
- ******************************************************************************/
-
-// Returns an array of possible currency codes.
-function _commerce_dps_pxpay_currency_array() {
-  //return drupal_map_assoc(array('AUD', 'CAD', 'CHF', 'EUR', 'GBP', 'HKD', 'JPY', 'MXN', 'NOK', 'NZD', 'PLN', 'SEK', 'SGD', 'USD'));
-  return array(
-    'CAD' => 'Canadian Dollar',
-    'CHF' => 'Swiss Franc',
-    'EUR' => 'Euro',
-    'FRF' => 'French Franc',
-    'GBP' => 'United Kingdom Pound',
-    'HKD' => 'Hong Kong Dollar',
-    'JPY' => 'Japanese Yen',
-    'NZD' => 'New Zealand Dollar',
-    'SGD' => 'Singapore Dollar',
-    'USD' => 'United States Dollar',
-    'ZAR' => 'Rand',
-    'AUD' => 'Australian Dollar',
-    'WST' => 'Samoan Tala',
-    'VUV' => 'Vanuatu Vatu',
-    'TOP' => 'Tongan Pa\'anga',
-    'SBD' => 'Solomon Islands Dollar',
-    'PNG' => 'Papua New Guinea Kina',
-    'MYR' => 'Malaysian Ringgit',
-    'KWD' => 'Kuwaiti Dinar',
-    'FJD' => 'Fiji Dollar',
-  );
 }

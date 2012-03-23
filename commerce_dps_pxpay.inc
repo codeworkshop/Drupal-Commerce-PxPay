@@ -57,45 +57,38 @@ function commerce_dps_pxpay_generate_request($transaction) {
  * @param string $response Encryped transaction data sent from DPS.
  * @return array $data Transaction data.
  */
-function commerce_dps_pxpay_process_response($userid, $key, $response) {
-
+function commerce_dps_pxpay_process_response($transaction) {
+  // in testing, I'm sure I saw this work without setting
+  // PxPayUserId ... weird.
   $xml = '<ProcessResponse>';
-  $xml .= '<PxPayUserId>' . $userid . '</PxPayUserId>';
-  $xml .= '<PxPayKey>' . $key . '</PxPayKey>';
-  $xml .= '<Response>' . $response . '</Response>';
+  $xml .= '<PxPayUserId>' . $transaction['user_id'] . '</PxPayUserId>';
+  $xml .= '<PxPayKey>' . $transaction['key'] . '</PxPayKey>';
+  $xml .= '<Response>' . $transaction['result'] . '</Response>';
   $xml .= '</ProcessResponse>';
-
-  if (variable_get('commerce_dps_pxpay_log', FALSE)) {
-    watchdog('commerce_dps_pxpay', 'ProcessResponse: @reference, @xml', array('@reference' => $reference, '@xml' => $xml), WATCHDOG_DEBUG);
-  }
 
   $url = variable_get('commerce_dps_pxpay_server', 'https://sec.paymentexpress.com/pxpay/pxaccess.aspx');
   //flog_it(__FUNCTION__ . ': url=' . $url . ', xml=' . $xml);
   $response = drupal_http_request($url, array('method' => 'POST', 'data' => $xml));
 
-  if (variable_get('commerce_dps_pxpay_log', FALSE)) {
-    watchdog('commerce_dps_pxpay', 'ProcessResponse response: @reference, HTTP @code, @xml', array('@reference' => $reference, '@code' => $response->code, '@xml' => $response->data), WATCHDOG_DEBUG);
+  if ($transaction['log']) {
+    watchdog('commerce_dps_pxpay', 'ProcessResponse response: HTTP @code, @xml', array('@code' => $response->code, '@xml' => $response->data), WATCHDOG_DEBUG);
   }
 
-  //flog_it(__FUNCTION__ . ': response=' . print_r($response, TRUE));
   // 6. Response XML Document. If response from PX Pay is good, extract and return transaction data.
   if ($response->code == 200) {
     $xml = simplexml_load_string($response->data);
     // Build data array.
     foreach ($xml->attributes() as $attribute => $value) {
-      //flog_it(__FUNCTION__ . ': attribute=' . $attribute . ', value=' . $value);
       if ($attribute == 'valid' && $value == '1') {
         $data = array();
         // Since response XML is only one level deep, simply iterate over XML elements and gather values.
         foreach ($xml->children() as $child) {
           $data[$child->getName()] = (string)$child;
         }
-        //flog_it(__FUNCTION__ . ': data extracted=' . print_r($data, TRUE));
         return $data;
       }
       else {
         // @todo: send to watchdog.
-        //flog_it(__FUNCTION__ . ': ProcessResponse was not valid.');
       }
     }
   }
