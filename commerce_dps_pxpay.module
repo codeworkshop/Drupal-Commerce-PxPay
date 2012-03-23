@@ -2,12 +2,9 @@
 
 /**
  * @file
- * Integrates the DPS PxPay gateway with Drupal Commerce!
+ * Integrates the DPS PxPay gateway with Drupal Commerce.
  */
 
-/*******************************************************************************
- * DPS Definitions
- ******************************************************************************/
 define('COMMERCE_DPS_PXPAY_USERID', 'Sample User');
 define('COMMERCE_DPS_PXPAY_KEY', 'Sample Key');
 define('COMMERCE_DPS_PXPAY_SERVER', 'https://sec.paymentexpress.com/pxpay/pxaccess.aspx');
@@ -15,10 +12,9 @@ define('COMMERCE_DPS_PXPAY_CURRENCY', 'NZD');
 define('COMMERCE_DPS_PXPAY_CANCEL_RETURN_URL', 'cart');
 define('COMMERCE_DPS_PXPAY_REFPREFIX', 'Website Order');
 
-/*******************************************************************************
- * Hook Functions (Drupal Commerce)
- ******************************************************************************/
-
+/**
+ * Implement hook_commerce_payment_method_info().
+ */
 function commerce_dps_pxpay_commerce_payment_method_info() {
   return array(
     'commerce_dps_pxpay' => array(
@@ -33,10 +29,29 @@ function commerce_dps_pxpay_commerce_payment_method_info() {
   );
 }
 
+/**
+ * Implements hook_redirect_form().
+ */
+function commerce_dps_pxpay_redirect_form($form, &$form_state, $order, $payment_method) {
+  // Return an error if the DPS payment gateway userid and key aren't configured.
+  if (empty($payment_method['settings']['commerce_dps_pxpay_userid']) ||
+    empty($payment_method['settings']['commerce_dps_pxpay_key'])
+  ) {
+    drupal_set_message(t('The DPS payment gateway cannot be used at this time'), 'error');
+    return array();
+  }
 
-/*******************************************************************************
- * Callback Functions, Forms, and Tables
- ******************************************************************************/
+  $settings = array(
+    // Return to the previous page when payment is canceled
+    'cancel_return' => url('checkout/' . $order->order_id . '/payment/back/' . $order->data['payment_redirect_key'], array('absolute' => TRUE)),
+    // Return to the payment redirect page for processing successful payments
+    'return' => url('checkout/' . $order->order_id . '/payment/return/' . $order->data['payment_redirect_key'], array('absolute' => TRUE)),
+    // Specify the current payment method instance ID in the notify_url
+    'payment_method' => $payment_method['instance_id'],
+  );
+
+  return commerce_dps_pxpay_order_form($form, $form_state, $order, $payment_method['settings'] + $settings);
+}
 
 /**
  * Payment method callback: settings form.
@@ -51,7 +66,7 @@ function commerce_dps_pxpay_settings_form($settings = NULL) {
     'commerce_dps_pxpay_server' => COMMERCE_DPS_PXPAY_SERVER,
     'commerce_dps_pxpay_currency' => COMMERCE_DPS_PXPAY_CURRENCY,
     'commerce_dps_pxpay_cancel_return_url' => COMMERCE_DPS_PXPAY_CANCEL_RETURN_URL,
-    'commerce_dps_pxpay_refprefix' => COMMERCE_DPS_PXPAY_REFPREFIX
+    'commerce_dps_pxpay_refprefix' => COMMERCE_DPS_PXPAY_REFPREFIX,
   );
 
   $form['commerce_dps_pxpay_userid'] = array(
@@ -105,7 +120,6 @@ function commerce_dps_pxpay_settings_form($settings = NULL) {
   return $form;
 }
 
-
 /**
  * Payment method callback: checkout form.
  */
@@ -113,11 +127,11 @@ function commerce_dps_pxpay_submit_form($payment_method, $pane_values, $checkout
   $form['commerce_dps_pxpay_logo'] = array(
     '#markup' => l(
       theme_image(array(
-        'path' => drupal_get_path('module', 'commerce_paymentexpress') . '/images/dps_paymentexpress_small.png',
-        'alt' => t('DPS - Payment Gateway by Payment Express.'),
-        'title' => t('DPS - Payment Gateway by Payment Express.'),
-        'attributes' => array('style' => 'float: left; margin: 1em 1em 1em 1.5em;'),
-      )),
+          'path' => drupal_get_path('module', 'commerce_paymentexpress') . '/images/dps_paymentexpress_small.png',
+          'alt' => t('DPS - Payment Gateway by Payment Express.'),
+          'title' => t('DPS - Payment Gateway by Payment Express.'),
+          'attributes' => array('style' => 'float: left; margin: 1em 1em 1em 1.5em;'),
+        )),
       'http://www.paymentexpress.com',
       array('html' => TRUE, 'attributes' => array('target' => '_blank'))
     ),
@@ -127,65 +141,40 @@ function commerce_dps_pxpay_submit_form($payment_method, $pane_values, $checkout
 }
 
 /**
- * Implements hook_redirect_form().
+ * Called from commerce_dps_pxpay_redirect_form().
  */
-function commerce_dps_pxpay_redirect_form($form, &$form_state, $order, $payment_method) {
-  // Return an error if the DPS payment gateway userid and key aren't configured.
-  if (empty($payment_method['settings']['commerce_dps_pxpay_userid']) ||
-  empty($payment_method['settings']['commerce_dps_pxpay_key'])) {
-    drupal_set_message(t('The DPS payment gateway cannot be used at this time'), 'error');
-    return array();
-  }
-
-  $settings = array(
-    // Return to the previous page when payment is canceled
-    'cancel_return' => url('checkout/' . $order->order_id . '/payment/back/' . $order->data['payment_redirect_key'], array('absolute' => TRUE)),
-
-    // Return to the payment redirect page for processing successful payments
-    'return' => url('checkout/' . $order->order_id . '/payment/return/' . $order->data['payment_redirect_key'], array('absolute' => TRUE)),
-
-    // Specify the current payment method instance ID in the notify_url
-    'payment_method' => $payment_method['instance_id'],
-  );
-
-  return commerce_dps_pxpay_order_form($form, $form_state, $order, $payment_method['settings'] + $settings);
-}
-
 function commerce_dps_pxpay_order_form($form, &$form_state, $order, $settings) {
   module_load_include('inc', 'commerce_dps_pxpay', 'commerce_dps_pxpay');
 
   $transaction = array(
-    'user_id'     => $settings['commerce_dps_pxpay_userid'],
-    'server'      => $settings['commerce_dps_pxpay_server'],
-    'key'         => $settings['commerce_dps_pxpay_key'],
-    'amount'      => $order->commerce_order_total['und'][0]['amount'] / 100,
-    'type'        => 'Purchase',
-    'txn_id'      => uniqid($order->order_number),
-    'reference'   => $settings['commerce_dps_pxpay_refprefix'] ." #". $order->order_number,
-    'currency'    => 'NZD',
+    'user_id' => $settings['commerce_dps_pxpay_userid'],
+    'server' => $settings['commerce_dps_pxpay_server'],
+    'key' => $settings['commerce_dps_pxpay_key'],
+    'amount' => $order->commerce_order_total['und'][0]['amount'] / 100,
+    'type' => 'Purchase',
+    'txn_id' => uniqid($order->order_number),
+    'reference' => $settings['commerce_dps_pxpay_refprefix'] . " #" . $order->order_number,
+    'currency' => 'NZD',
     'url_success' => $settings['return'],
     'url_failure' => $settings['cancel_return'],
-    'email'       => $order->mail,
-    'log'         => TRUE,
+    'email' => $order->mail,
+    'log' => TRUE,
   );
 
   if ($url = commerce_dps_pxpay_generate_request($transaction)) {
     drupal_goto($url);
   }
   else {
-    watchdog('commerce_dps_pxpay', 'Unable to generate DPS request with settings: @settings', array('@settings' => print_r($settings,1)), WATCHDOG_DEBUG);
+    watchdog('commerce_dps_pxpay', 'Unable to generate DPS request with settings: @settings', array('@settings' => print_r($settings, 1)), WATCHDOG_DEBUG);
   }
 }
 
 /**
- * Implements hook_redirect_form_validate
- *
- * // had "$payment_method['settings'] + $settings" as second param?
+ * Implements hook_redirect_form_validate().
  */
-function commerce_dps_pxpay_redirect_form_validate($order, $payment_method){
-  $settings = $payment_method['settings'];
-
+function commerce_dps_pxpay_redirect_form_validate($order, $payment_method) {
   module_load_include('inc', 'commerce_dps_pxpay', 'commerce_dps_pxpay');
+  $settings = $payment_method['settings'];
 
   $transaction = array(
     'server' => $settings['commerce_dps_pxpay_server'],
@@ -209,14 +198,15 @@ function commerce_dps_pxpay_redirect_form_validate($order, $payment_method){
     drupal_goto($settings['commerce_dps_pxpay_cancel_return_url']);
   }
 
-  foreach($response as $k => $v) {
-    $tokens->data['payment_details']['pxpay_'.$k] = $v;
+  foreach ($response as $k => $v) {
+    $tokens->data['payment_details']['pxpay_' . $k] = $v;
   }
 
   // Local validation.
-  $merchant_reference = $settings['commerce_dps_pxpay_refprefix'] ." #". $order->order_number;
+  $merchant_reference = $settings['commerce_dps_pxpay_refprefix'] . " #" . $order->order_number;
   if ($merchant_reference != $response['MerchantReference'] ||
-      $order->mail != $response['EmailAddress']) {
+    $order->mail != $response['EmailAddress']
+  ) {
     watchdog('commerce_dps_pxpay', 'DPS PxPay details do not match order details! Cart order ID: @cart_order', array('@cart_order' => $order->order_number), WATCHDOG_NOTICE);
 
     drupal_set_message(t('The details of your DPS PxPay payment do not match your order. Please contact us for assistance. Reference Order Id: @orderid', array('@orderid' => $order->order_number)));
@@ -233,7 +223,9 @@ function commerce_dps_pxpay_redirect_form_validate($order, $payment_method){
 }
 
 /**
- * Create a transaction and associate it with an order
+ * Create a transaction and associate it with an order.
+ *
+ * @TODO move to .inc ?
  */
 function commerce_dps_pxpay_form_transaction($payment_method, $order, $tokens, $transaction_status) {
   $settings = $payment_method['settings'];
@@ -247,13 +239,13 @@ function commerce_dps_pxpay_form_transaction($payment_method, $order, $tokens, $
   // set a status for the payment - one of COMMERCE_PAYMENT_STATUS_SUCCESS, COMMERCE_PAYMENT_STATUS_PENDING or COMMERCE_PAYMENT_STATUS_FAILURE
   $transaction->status = $transaction_status;
   $transaction->message = 'Status @status, @statusdetail. Email: @vpstxid. Auth Code=@authcode.';
-  $transaction->message_variables =
-    array(
-      '@status'       => $tokens->data['payment_details']['pxpay_Success'],
-      '@statusdetail' => $tokens->data['payment_details']['pxpay_ResponseText'],
-      '@email'        => $tokens->data['payment_details']['pxpay_EmailAddress'],
-      '@authcode'     => $tokens->data['payment_details']['pxpay_AuthCode'],
-    );
+  $transaction->message_variables = array(
+    '@status' => $tokens->data['payment_details']['pxpay_Success'],
+    '@statusdetail' => $tokens->data['payment_details']['pxpay_ResponseText'],
+    '@email' => $tokens->data['payment_details']['pxpay_EmailAddress'],
+    '@authcode' => $tokens->data['payment_details']['pxpay_AuthCode'],
+  );
 
   commerce_payment_transaction_save($transaction);
 }
+

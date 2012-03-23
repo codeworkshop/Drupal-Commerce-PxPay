@@ -34,16 +34,16 @@ function commerce_dps_pxpay_generate_request($transaction) {
 
   // If response from PX Pay is ok, extract and return Hosted Payment Page URI to redirect user to.
   if ($response->code == 200) {
-     if ($xml = simplexml_load_string($response->data)) {
-       foreach ($xml->attributes() as $attribute => $value) {
-          if ($attribute == 'valid' && $value == '1') {
-            return $xml->URI;
-          }
-          else {
-            watchdog('commerce_dps_pxpay', 'GenerateRequest invalid: @reference, XML: @xml', array('@reference' => $transaction['reference'], '@xml' => $response->data), WATCHDOG_ERROR);
-          }
-       }
-     }
+    if ($xml = simplexml_load_string($response->data)) {
+      foreach ($xml->attributes() as $attribute => $value) {
+        if ($attribute == 'valid' && $value == '1') {
+          return $xml->URI;
+        }
+        else {
+          watchdog('commerce_dps_pxpay', 'GenerateRequest invalid: @reference, XML: @xml', array('@reference' => $transaction['reference'], '@xml' => $response->data), WATCHDOG_ERROR);
+        }
+      }
+    }
   }
   watchdog('commerce_dps_pxpay', 'GenerateRequest: @reference, HTTP @code, XML: @xml', array('@reference' => $reference, '@code' => $response->code, '@xml' => $response->data), WATCHDOG_ERROR);
   return FALSE;
@@ -55,6 +55,7 @@ function commerce_dps_pxpay_generate_request($transaction) {
  * @param string $userid User id assigned by DPS
  * @param string $key Merchant account key assigned by DPS
  * @param string $response Encryped transaction data sent from DPS.
+ *
  * @return array $data Transaction data.
  */
 function commerce_dps_pxpay_process_response($transaction) {
@@ -122,3 +123,4 @@ function commerce_dps_pxpay_currencies() {
     'FJD' => 'Fiji Dollar',
   );
 }
+
