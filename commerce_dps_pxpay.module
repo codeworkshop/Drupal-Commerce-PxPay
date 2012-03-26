@@ -127,7 +127,7 @@ function commerce_dps_pxpay_submit_form($payment_method, $pane_values, $checkout
   $form['commerce_dps_pxpay_logo'] = array(
     '#markup' => l(
       theme_image(array(
-          'path' => drupal_get_path('module', 'commerce_paymentexpress') . '/images/dps_paymentexpress_small.png',
+          'path' => drupal_get_path('module', 'commerce_dps_pxpay') . '/images/dps_paymentexpress_small.png',
           'alt' => t('DPS - Payment Gateway by Payment Express.'),
           'title' => t('DPS - Payment Gateway by Payment Express.'),
           'attributes' => array('style' => 'float: left; margin: 1em 1em 1em 1.5em;'),
@@ -232,13 +232,13 @@ function commerce_dps_pxpay_form_transaction($payment_method, $order, $tokens, $
 
   $transaction = commerce_payment_transaction_new('commerce_dps_pxpay', $order->order_id);
   $transaction->instance_id = $payment_method['instance_id'];
-  $transaction->amount = $tokens->data['payment_details']['pxpay_AmountSettlement'];
+  $transaction->amount = $tokens->data['payment_details']['pxpay_AmountSettlement'] * 100;
   $transaction->currency_code = $settings['commerce_dps_pxpay_currency'];
   $transaction->remote_id = $tokens->data['payment_details']['pxpay_DpsTxnRef'];
 
   // set a status for the payment - one of COMMERCE_PAYMENT_STATUS_SUCCESS, COMMERCE_PAYMENT_STATUS_PENDING or COMMERCE_PAYMENT_STATUS_FAILURE
   $transaction->status = $transaction_status;
-  $transaction->message = 'Status @status, @statusdetail. Email: @vpstxid. Auth Code=@authcode.';
+  $transaction->message = 'Status @status, @statusdetail. Email: @email. Auth Code=@authcode.';
   $transaction->message_variables = array(
     '@status' => $tokens->data['payment_details']['pxpay_Success'],
     '@statusdetail' => $tokens->data['payment_details']['pxpay_ResponseText'],
